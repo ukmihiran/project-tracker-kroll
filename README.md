@@ -4,7 +4,7 @@ A modern, minimalist project and career-goal tracking app built with Next.js.
 
 ## Preview
 
-![ProjectTracker Dashboard](./public/dashboard-preview.png)
+![ProjectTracker Dashboard](./public/dashboard.png)
 
 ## Features
 
