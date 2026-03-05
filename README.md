@@ -50,6 +50,3 @@ prisma            # database schema
 public            # static assets
 ```
 
-## License
-
-Private project.
