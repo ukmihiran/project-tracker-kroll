@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String
+  name           String?
+  role           String    @default("CONSULTANT") // PM, EM, CONSULTANT
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  projects       Project[] @relation("UserProjects")
+  efrs           EfrSubmission[] @relation("UserEfrs")
+  notifications  Notification[] @relation("UserNotifications")
+}
+
+model Project {
+  id                  String   @id @default(uuid())
+  engagementName      String
+  clientName          String
+  assessmentType      String
+  status              String   @default("Active") // Active, Placeholder, Delivered, Cancelled
+  timelineStart       DateTime?
+  timelineEnd         DateTime?
+  billable            Boolean  @default(true)
+  shadowing           Boolean  @default(false)
+  effortTimeHours     Int      @default(0)
+
+  projectID           String?
+  EM                  String?
+  PM                  String?
+  consultants         String?
+  projectReportLink   String?
+
+  isMultiPerson       Boolean  @default(false)
+  isLeadConsultant    Boolean  @default(false)
+
+  userId              String?
+  user                User?    @relation("UserProjects", fields: [userId], references: [id])
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model EfrSubmission {
+  id               String   @id @default(uuid())
+  title            String
+  description      String?
+  quarter          String   // e.g. "Q1-2026", "Q2-2026"
+  evaluator        String   // Who evaluated
+  engagement       String   // CLIENT - PROJECT_NAME
+  engagementStart  DateTime // Engagement start date
+  role             String   // Role played in engagement
+  duration         String   // Less than week / 1 week / 2 weeks / 3 weeks or more
+  contextComment   String?  // Context/comment received
+  submittedAt      DateTime @default(now())
+
+  userId           String
+  user             User     @relation("UserEfrs", fields: [userId], references: [id])
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  type      String   // "assessment_due" | "efr_reminder" | "project_ending" | "info"
+  read      Boolean  @default(false)
+  link      String?  // Optional tab/route to navigate to
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+}
