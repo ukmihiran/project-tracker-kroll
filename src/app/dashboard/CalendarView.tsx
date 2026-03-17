@@ -25,7 +25,6 @@ import {
   isSameDay,
   isToday,
   type CalendarEvent,
-  type WeekEventPlacement,
 } from "@/lib/calendar-utils"
 
 interface CalendarViewProps {
@@ -107,6 +106,7 @@ export default function CalendarView({ projects, efrs, tasks }: CalendarViewProp
   )
   const selectedEvents = useMemo(() => getEventsForDate(events, selectedDate), [events, selectedDate])
   const monthSummary = useMemo(() => getMonthEventSummary(events, currentYear, currentMonth), [events, currentYear, currentMonth])
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const upcomingEvents = useMemo(() => {
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
@@ -209,7 +209,7 @@ export default function CalendarView({ projects, efrs, tasks }: CalendarViewProp
                       <button
                         key={day.date.toISOString()}
                         onClick={() => setSelectedDate(day.date)}
-                        className={`group min-h-[148px] flex flex-col border-r border-border/20 text-left transition-colors last:border-r-0 hover:bg-muted/20 ${day.isCurrentMonth ? "bg-background" : "bg-muted/10 text-muted-foreground/60"} ${isSelected ? "bg-primary/5" : ""}`}
+                        className={`group min-h-37 flex flex-col border-r border-border/20 text-left transition-colors last:border-r-0 hover:bg-muted/20 ${day.isCurrentMonth ? "bg-background" : "bg-muted/10 text-muted-foreground/60"} ${isSelected ? "bg-primary/5" : ""}`}
                       >
                         <div className="flex items-center justify-between gap-2 p-2.5 pb-1">
                           <span
@@ -222,12 +222,12 @@ export default function CalendarView({ projects, efrs, tasks }: CalendarViewProp
                           )}
                         </div>
 
-                        <div className="mt-1 space-y-[2px] w-full flex-1">
+                        <div className="mt-1 space-y-0.5 w-full flex-1">
                           {Array.from({ length: VISIBLE_LANES }).map((_, laneIndex) => {
                             const laneEvent = placements.find((placement) => placement.lane === laneIndex && eventOccursOnDate(placement, day.date))
 
                             if (!laneEvent) {
-                              return <div key={`${day.date.toISOString()}-${laneIndex}`} className="h-[22px]" />
+                              return <div key={`${day.date.toISOString()}-${laneIndex}`} className="h-5.5" />
                             }
 
                             const isRangeStart = isSameDay(day.date, laneEvent.visibleStart)
@@ -240,7 +240,7 @@ export default function CalendarView({ projects, efrs, tasks }: CalendarViewProp
                               <div
                                 key={laneEvent.id}
                                 title={`${laneEvent.title} • ${formatEventRange(laneEvent)}`}
-                                className={`flex h-[22px] items-center overflow-hidden text-[10.5px] font-medium text-white ${laneEvent.colorClass} ${isSingleDayEvent || (isRangeStart && isRangeEnd) ? "rounded-md mx-1.5 px-2" : `${isRangeStart ? "rounded-l-md ml-1.5 pl-2" : "pl-3"} ${isRangeEnd ? "rounded-r-md mr-1.5 pr-2" : "pr-0"}`}`}
+                                className={`flex h-5.5 items-center overflow-hidden text-[10.5px] font-medium text-white ${laneEvent.colorClass} ${isSingleDayEvent || (isRangeStart && isRangeEnd) ? "rounded-md mx-1.5 px-2" : `${isRangeStart ? "rounded-l-md ml-1.5 pl-2" : "pl-3"} ${isRangeEnd ? "rounded-r-md mr-1.5 pr-2" : "pr-0"}`}`}
                               >
                                 <span className="truncate">{showTitle ? laneEvent.title : "\u00A0"}</span>
                               </div>

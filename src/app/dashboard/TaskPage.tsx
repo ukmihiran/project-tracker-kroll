@@ -287,7 +287,7 @@ function BoardLane({
   onDelete: (task: any) => void
 }) {
   return (
-    <Card className="rounded-3xl border border-border/50 bg-card p-4 shadow-sm flex flex-col h-full max-h-[800px]">
+    <Card className="rounded-3xl border border-border/50 bg-card p-4 shadow-sm flex flex-col h-full max-h-200">
       <div className="mb-4 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -305,7 +305,7 @@ function BoardLane({
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`space-y-3 min-h-[150px] flex-1 overflow-y-auto pr-1 transition-colors rounded-xl p-1 -m-1 ${snapshot.isDraggingOver ? "bg-primary/5 border border-dashed border-primary/20" : ""}`}
+            className={`space-y-3 min-h-37.5 flex-1 overflow-y-auto pr-1 transition-colors rounded-xl p-1 -m-1 ${snapshot.isDraggingOver ? "bg-primary/5 border border-dashed border-primary/20" : ""}`}
           >
             {tasks.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border/60 p-4 text-xs text-center text-muted-foreground mt-2">
