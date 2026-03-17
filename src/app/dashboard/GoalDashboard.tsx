@@ -2,9 +2,14 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { FileText, TrendingUp, Users, CheckCircle2, Clock, XCircle, BarChart3, Activity } from "lucide-react"
+import { FileText, TrendingUp, Users, CheckCircle2, Clock, XCircle, BarChart3, Activity, CheckSquare2, ShieldAlert } from "lucide-react"
 
 interface DashboardStats {
+  cycle: {
+    name: string
+    year: number
+    focusText?: string | null
+  }
   assessmentCounts: {
     active: number
     placeholder: number
@@ -19,6 +24,14 @@ interface DashboardStats {
   multiPersonTarget: number
   currentQuarter: string
   yearQuarters: string[]
+  taskCounts: {
+    todo: number
+    inProgress: number
+    blocked: number
+    done: number
+    dueToday: number
+    overdue: number
+  }
 }
 
 function ProgressBar({ value, max, color, className = "" }: { value: number; max: number; color: string; className?: string }) {
@@ -62,12 +75,14 @@ export default function GoalDashboard({
 
   return (
     <div className="space-y-8">
-      {/* Assessment Overview Stats */}
       <div>
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-semibold">Assessment Overview</h3>
         </div>
+        <p className="mb-4 text-sm text-muted-foreground">
+          {stats.cycle.name} stays centered on active delivery, completed outcomes, and the goals you are tracking through {stats.cycle.year}.
+        </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
           <StatCard label="Active" value={stats.assessmentCounts.active} icon={Activity} gradient="gradient-emerald" />
           <StatCard label="Placeholder" value={stats.assessmentCounts.placeholder} icon={Clock} gradient="gradient-amber" />
@@ -174,6 +189,43 @@ export default function GoalDashboard({
                   </div>
                 )
               })}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <CheckSquare2 className="h-5 w-5 text-primary" />
+          <h3 className="text-lg font-semibold">Task Momentum</h3>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label="To do" value={stats.taskCounts.todo} icon={CheckSquare2} gradient="gradient-blue" />
+          <StatCard label="In Progress" value={stats.taskCounts.inProgress} icon={Activity} gradient="gradient-indigo" />
+          <StatCard label="Blocked" value={stats.taskCounts.blocked} icon={ShieldAlert} gradient="gradient-rose" />
+          <StatCard label="Done" value={stats.taskCounts.done} icon={CheckCircle2} gradient="gradient-emerald" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Due Today</p>
+                <p className="text-3xl font-bold mt-1">{stats.taskCounts.dueToday}</p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl gradient-amber shadow-lg">
+                <Clock className="h-5 w-5 text-white" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Overdue</p>
+                <p className="text-3xl font-bold mt-1">{stats.taskCounts.overdue}</p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl gradient-rose shadow-lg">
+                <ShieldAlert className="h-5 w-5 text-white" />
+              </div>
             </CardContent>
           </Card>
         </div>

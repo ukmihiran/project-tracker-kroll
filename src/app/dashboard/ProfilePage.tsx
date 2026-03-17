@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { signOut } from "next-auth/react"
 import {
   User, Mail, Shield, Calendar, FolderOpen, FileText,
   Pencil, Lock, Trash2, Eye, EyeOff, Check, X, AlertTriangle, Loader2,
-  Download, Upload, Database, HardDrive,
+  Download, Upload, Database,
 } from "lucide-react"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -20,22 +20,50 @@ import {
 import {
   getProfile, updateProfile, changePassword, deleteAccount,
 } from "@/app/actions/profileActions"
-import { createBackup, restoreBackup, getDatabaseBackup } from "@/app/actions/backupActions"
+import { createBackup, restoreBackup } from "@/app/actions/backupActions"
+import WorkspaceSettingsPanel from "./WorkspaceSettingsPanel"
 
 interface ProfilePageProps {
   userName?: string | null
+  initialProfile?: any
   onProfileUpdate?: (name: string, email: string) => void
+  onDataRefresh?: () => Promise<unknown>
+  workCycles?: any[]
+  selectedCycleId?: string
+  projects?: any[]
+  efrs?: any[]
+  tasks?: any[]
+  onSelectCycle?: (cycleId: string) => void
+  onCreateWorkspace?: () => void
+  onEditWorkspace?: (cycle: any) => void
+  onPrepareNextYear?: () => Promise<boolean>
+  onDeleteWorkspace?: (cycle: any) => Promise<boolean>
 }
 
-export default function ProfilePage({ userName, onProfileUpdate }: ProfilePageProps) {
+export default function ProfilePage({
+  userName,
+  initialProfile,
+  onProfileUpdate,
+  onDataRefresh,
+  workCycles = [],
+  selectedCycleId,
+  projects = [],
+  efrs = [],
+  tasks = [],
+  onSelectCycle,
+  onCreateWorkspace,
+  onEditWorkspace,
+  onPrepareNextYear,
+  onDeleteWorkspace,
+}: ProfilePageProps) {
   // Profile data
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<any>(initialProfile ?? null)
+  const [loading, setLoading] = useState(false)
 
   // Edit profile state
   const [editMode, setEditMode] = useState(false)
-  const [editName, setEditName] = useState("")
-  const [editEmail, setEditEmail] = useState("")
+  const [editName, setEditName] = useState(initialProfile?.name || "")
+  const [editEmail, setEditEmail] = useState(initialProfile?.email || "")
   const [profileSaving, setProfileSaving] = useState(false)
 
   // Change password state
@@ -56,23 +84,19 @@ export default function ProfilePage({ userName, onProfileUpdate }: ProfilePagePr
 
   // Backup state
   const [backingUp, setBackingUp] = useState(false)
-  const [backingUpDb, setBackingUpDb] = useState(false)
   const [restoring, setRestoring] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-    getProfile().then((res) => {
-      if (cancelled) return
-      if (res.success && res.user) {
-        setProfile(res.user)
-        setEditName(res.user.name || "")
-        setEditEmail(res.user.email || "")
-      } else {
-        toast.error(res.error || "Failed to load profile")
-      }
-      setLoading(false)
-    })
-    return () => { cancelled = true }
+  const loadProfile = useCallback(async () => {
+    setLoading(true)
+    const res = await getProfile()
+    if (res.success && res.user) {
+      setProfile(res.user)
+      setEditName(res.user.name || "")
+      setEditEmail(res.user.email || "")
+    } else {
+      toast.error(res.error || "Failed to load profile")
+    }
+    setLoading(false)
   }, [])
 
   const handleSaveProfile = async () => {
@@ -185,31 +209,6 @@ export default function ProfilePage({ userName, onProfileUpdate }: ProfilePagePr
     setBackingUp(false)
   }
 
-  const handleDownloadDatabase = async () => {
-    setBackingUpDb(true)
-    try {
-      const res = await getDatabaseBackup()
-      if (res.success && res.data) {
-        const bytes = Uint8Array.from(atob(res.data), c => c.charCodeAt(0))
-        const blob = new Blob([bytes], { type: "application/x-sqlite3" })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = res.filename || "database.db"
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-        toast.success("Database backup downloaded")
-      } else {
-        toast.error(res.error || "Failed to download database")
-      }
-    } catch {
-      toast.error("Failed to download database")
-    }
-    setBackingUpDb(false)
-  }
-
   const handleRestoreBackup = () => {
     const input = document.createElement("input")
     input.type = "file"
@@ -222,6 +221,10 @@ export default function ProfilePage({ userName, onProfileUpdate }: ProfilePagePr
         const text = await file.text()
         const res = await restoreBackup(text)
         if (res.success) {
+          await Promise.all([
+            loadProfile(),
+            onDataRefresh?.(),
+          ])
           toast.success(res.message || "Backup restored successfully")
         } else {
           toast.error(res.error || "Failed to restore backup")
@@ -276,12 +279,12 @@ export default function ProfilePage({ userName, onProfileUpdate }: ProfilePagePr
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h3 className="text-xl font-semibold">Profile Settings</h3>
+        <h3 className="text-xl font-semibold">Profile & Settings</h3>
         <p className="text-sm text-muted-foreground">
-          Manage your account information and security settings
+          Manage your account, workspace flow, security, and backups in one place
         </p>
       </div>
 
@@ -313,7 +316,7 @@ export default function ProfilePage({ userName, onProfileUpdate }: ProfilePagePr
           </div>
 
           {/* Stats Row */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className={`grid gap-4 mb-6 ${workCycles.length > 0 ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-2"}`}>
             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/30">
               <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-500/10">
                 <FolderOpen className="h-4 w-4 text-blue-500" />
@@ -332,6 +335,17 @@ export default function ProfilePage({ userName, onProfileUpdate }: ProfilePagePr
                 <p className="text-[11px] text-muted-foreground">EFR Submissions</p>
               </div>
             </div>
+            {workCycles.length > 0 && (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/30 col-span-2 lg:col-span-1">
+                <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-500/10">
+                  <Calendar className="h-4 w-4 text-indigo-500" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold">{workCycles.length}</p>
+                  <p className="text-[11px] text-muted-foreground">Workspaces</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Profile Info Section */}
@@ -435,6 +449,21 @@ export default function ProfilePage({ userName, onProfileUpdate }: ProfilePagePr
         </div>
       </Card>
 
+      {workCycles.length > 0 && onSelectCycle && onCreateWorkspace && onEditWorkspace && onPrepareNextYear && onDeleteWorkspace && (
+        <WorkspaceSettingsPanel
+          workCycles={workCycles}
+          selectedCycleId={selectedCycleId}
+          projects={projects}
+          efrs={efrs}
+          tasks={tasks}
+          onSelectCycle={onSelectCycle}
+          onCreateWorkspace={onCreateWorkspace}
+          onEditWorkspace={onEditWorkspace}
+          onPrepareNextYear={onPrepareNextYear}
+          onDeleteWorkspace={onDeleteWorkspace}
+        />
+      )}
+
       {/* Security Section */}
       <Card className="border border-border/40 shadow-sm rounded-xl overflow-hidden">
         <div className="p-6 space-y-4">
@@ -514,27 +543,6 @@ export default function ProfilePage({ userName, onProfileUpdate }: ProfilePagePr
               </Button>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-amber-500/10">
-                  <HardDrive className="h-4 w-4 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Database Backup</p>
-                  <p className="text-[11px] text-muted-foreground">Download the raw SQLite database file</p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-xl text-xs h-8"
-                onClick={handleDownloadDatabase}
-                disabled={backingUpDb}
-              >
-                {backingUpDb ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <HardDrive className="h-3 w-3 mr-1.5" />}
-                Download
-              </Button>
-            </div>
           </div>
 
           {/* Delete Account */}

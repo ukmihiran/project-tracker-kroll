@@ -9,18 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { deleteEfr } from "@/app/actions/efrActions"
+import { archiveEfr, deleteEfr } from "@/app/actions/efrActions"
 import { toast } from "react-toastify"
 import { useConfirm } from "@/components/ConfirmDialog"
 import {
-  PlusCircle, Trash2, FileText, Search, Filter, X,
+  PlusCircle, Trash2, FileText, Search, Filter, X, Archive,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   ArrowUp, ArrowDown, ArrowUpDown, MessageSquare, Pencil,
 } from "lucide-react"
 
 interface EfrPageProps {
   efrs: any[]
-  setEfrs: (e: any[]) => void
+  setEfrs: any
   onAddEfr: () => void
   onEditEfr: (efr: any) => void
 }
@@ -107,9 +107,27 @@ export default function EfrPage({ efrs, setEfrs, onAddEfr, onEditEfr }: EfrPageP
     const res = await deleteEfr(id)
     if (res.success) {
       toast.success("EFR deleted")
-      setEfrs(efrs.filter((e: any) => e.id !== id))
+      setEfrs((currentEfrs: any[]) => currentEfrs.filter((e: any) => e.id !== id))
     } else {
       toast.error(res.error || "Failed to delete")
+    }
+  }
+
+  const handleArchive = async (id: string) => {
+    const confirmed = await confirm({
+      title: "Archive EFR Submission",
+      description: "This will move the EFR out of the active workspace but keep it in Archive.",
+      confirmText: "Archive",
+      cancelText: "Cancel",
+    })
+    if (!confirmed) return
+
+    const res = await archiveEfr(id)
+    if (res.success) {
+      toast.success("EFR archived")
+      setEfrs((currentEfrs: any[]) => currentEfrs.map((e: any) => e.id === id ? res.efr : e))
+    } else {
+      toast.error(res.error || "Failed to archive")
     }
   }
 
@@ -303,6 +321,15 @@ export default function EfrPage({ efrs, setEfrs, onAddEfr, onEditEfr }: EfrPageP
                           title="Edit EFR"
                         >
                           <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 rounded-lg text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10 transition-colors"
+                          onClick={(e) => { e.stopPropagation(); handleArchive(efr.id) }}
+                          title="Archive EFR"
+                        >
+                          <Archive className="h-3 w-3" />
                         </Button>
                         <Button
                           variant="ghost"

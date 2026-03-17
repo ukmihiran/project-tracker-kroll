@@ -9,6 +9,8 @@ import {
   FileText,
   UserCircle,
   Calendar,
+  CheckSquare2,
+  Archive,
   Moon,
   Sun,
   LogOut,
@@ -60,9 +62,11 @@ export default function Sidebar({ activeTab, onTabChange, userName, userEmail }:
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "tasks", label: "Tasks", icon: CheckSquare2 },
     { id: "assessments", label: "Assessments", icon: ClipboardList },
     { id: "efr", label: "EFR Submissions", icon: FileText },
     { id: "calendar", label: "Calendar", icon: Calendar },
+    { id: "archive", label: "Archive", icon: Archive },
     { id: "profile", label: "Profile", icon: UserCircle },
   ]
 

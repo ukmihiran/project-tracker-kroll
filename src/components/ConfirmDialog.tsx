@@ -10,7 +10,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, Trash2, HelpCircle, Info } from "lucide-react"
+import { AlertTriangle, Trash2, Info } from "lucide-react"
 
 type ConfirmVariant = "danger" | "warning" | "info"
 

@@ -16,9 +16,36 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  projects       Project[] @relation("UserProjects")
+  projects       Project[]       @relation("UserProjects")
   efrs           EfrSubmission[] @relation("UserEfrs")
   notifications  Notification[] @relation("UserNotifications")
+  workCycles     WorkCycle[]     @relation("UserWorkCycles")
+  tasks          Task[]          @relation("UserTasks")
+}
+
+model WorkCycle {
+  id                String          @id @default(uuid())
+  name              String
+  year              Int
+  startDate         DateTime
+  endDate           DateTime
+  status            String          @default("ACTIVE") // ACTIVE, PLANNED, CLOSED
+  focusText         String?
+  billableTarget    Int             @default(1500)
+  efrTarget         Int             @default(3)
+  multiPersonTarget Int             @default(1)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  userId            String
+  user              User            @relation("UserWorkCycles", fields: [userId], references: [id], onDelete: Cascade)
+
+  projects          Project[]
+  efrs              EfrSubmission[]
+  tasks             Task[]
+
+  @@unique([userId, year])
+  @@index([userId, status])
 }
 
 model Project {
@@ -41,12 +68,23 @@ model Project {
 
   isMultiPerson       Boolean  @default(false)
   isLeadConsultant    Boolean  @default(false)
+  archivedAt          DateTime?
+  archivedReason      String?
 
-  userId              String?
-  user                User?    @relation("UserProjects", fields: [userId], references: [id])
+  userId              String
+  user                User     @relation("UserProjects", fields: [userId], references: [id], onDelete: Cascade)
+  workCycleId         String?
+  workCycle           WorkCycle? @relation(fields: [workCycleId], references: [id], onDelete: SetNull)
+  carriedForwardFromId String?
+  carriedForwardFrom  Project? @relation("ProjectCarryForward", fields: [carriedForwardFromId], references: [id], onDelete: SetNull)
+  carriedForwardProjects Project[] @relation("ProjectCarryForward")
+  efrs                EfrSubmission[]
+  tasks               Task[]
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+
+  @@index([userId, workCycleId, archivedAt])
 }
 
 model EfrSubmission {
@@ -61,12 +99,49 @@ model EfrSubmission {
   duration         String   // Less than week / 1 week / 2 weeks / 3 weeks or more
   contextComment   String?  // Context/comment received
   submittedAt      DateTime @default(now())
+  archivedAt       DateTime?
+  archivedReason   String?
 
   userId           String
-  user             User     @relation("UserEfrs", fields: [userId], references: [id])
+  user             User     @relation("UserEfrs", fields: [userId], references: [id], onDelete: Cascade)
+  projectId        String?
+  project          Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  workCycleId      String?
+  workCycle        WorkCycle? @relation(fields: [workCycleId], references: [id], onDelete: SetNull)
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  @@index([userId, workCycleId, archivedAt])
+}
+
+model Task {
+  id            String    @id @default(uuid())
+  title         String
+  description   String?
+  status        String    @default("TODO") // TODO, IN_PROGRESS, BLOCKED, DONE
+  priority      String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate       DateTime?
+  reminderAt    DateTime?
+  completedAt   DateTime?
+  estimateHours Int       @default(0)
+  archivedAt    DateTime?
+  archivedReason String?
+
+  projectId     String?
+  project       Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  workCycleId   String
+  workCycle     WorkCycle @relation(fields: [workCycleId], references: [id], onDelete: Cascade)
+
+  userId        String
+  user          User      @relation("UserTasks", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId, workCycleId, archivedAt, status])
+  @@index([projectId])
 }
 
 model Notification {

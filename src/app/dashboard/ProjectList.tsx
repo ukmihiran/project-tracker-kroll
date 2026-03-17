@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo, useState } from "react"
 import {
   Table,
   TableBody,
@@ -14,19 +14,18 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { deleteProject } from "@/app/actions/projectActions"
+import { archiveProject, deleteProject } from "@/app/actions/projectActions"
 import { toast } from "react-toastify"
 import { useConfirm } from "@/components/ConfirmDialog"
 import {
-  Pencil, Trash2, FolderOpen, Search, Filter, X,
+  Pencil, Trash2, FolderOpen, Search, Filter, X, Archive,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   ArrowUpDown, ArrowUp, ArrowDown,
 } from "lucide-react"
 
 interface ProjectListProps {
   projects: any[]
-  allProjects: any[]
-  setProjects: (p: any[]) => void
+  setProjects: any
   onEdit: (p: any) => void
   searchQuery: string
   onSearchChange: (q: string) => void
@@ -44,7 +43,6 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50]
 
 export default function ProjectList({
   projects,
-  allProjects,
   setProjects,
   onEdit,
   searchQuery,
@@ -86,15 +84,12 @@ export default function ProjectList({
   }, [projects, sortField, sortDirection])
 
   // Pagination
-  const totalPages = Math.ceil(sortedProjects.length / pageSize)
+  const totalPages = Math.max(1, Math.ceil(sortedProjects.length / pageSize))
+  const effectivePage = Math.min(currentPage, totalPages)
   const paginatedProjects = useMemo(() => {
-    const start = (currentPage - 1) * pageSize
+    const start = (effectivePage - 1) * pageSize
     return sortedProjects.slice(start, start + pageSize)
-  }, [sortedProjects, currentPage, pageSize])
-
-  // Reset to page 1 when filters/projects change
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useMemo(() => { setCurrentPage(1) }, [projects.length, searchQuery, statusFilter, typeFilter])
+  }, [sortedProjects, effectivePage, pageSize])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -105,7 +100,7 @@ export default function ProjectList({
     }
   }
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const getSortIcon = (field: SortField) => {
     if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />
     return sortDirection === "asc"
       ? <ArrowUp className="h-3 w-3 ml-1 text-primary" />
@@ -124,7 +119,25 @@ export default function ProjectList({
     const res = await deleteProject(id)
     if (res.success) {
       toast.success("Project deleted successfully")
-      setProjects(allProjects.filter((p: any) => p.id !== id))
+      setProjects((currentProjects: any[]) => currentProjects.filter((p: any) => p.id !== id))
+    } else {
+      toast.error(res.error)
+    }
+  }
+
+  const handleArchive = async (id: string) => {
+    const confirmed = await confirm({
+      title: "Archive Project",
+      description: "This will move the project out of the active workspace and keep it available in Archive.",
+      confirmText: "Archive",
+      cancelText: "Cancel",
+    })
+    if (!confirmed) return
+
+    const res = await archiveProject(id)
+    if (res.success) {
+      toast.success("Project archived")
+      setProjects((currentProjects: any[]) => currentProjects.map((p: any) => p.id === id ? res.project : p))
     } else {
       toast.error(res.error)
     }
@@ -232,7 +245,7 @@ export default function ProjectList({
               <TableRow className="bg-muted/30 hover:bg-muted/30 border-b border-border/50">
                 <TableHead className="w-[24%] py-2 px-3">
                   <button onClick={() => handleSort("engagementName")} className="flex items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
-                    Project <SortIcon field="engagementName" />
+                    Project {getSortIcon("engagementName")}
                   </button>
                 </TableHead>
                 <TableHead className="w-[14%] py-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -240,22 +253,22 @@ export default function ProjectList({
                 </TableHead>
                 <TableHead className="w-[10%] py-2 px-3">
                   <button onClick={() => handleSort("assessmentType")} className="flex items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
-                    Type <SortIcon field="assessmentType" />
+                    Type {getSortIcon("assessmentType")}
                   </button>
                 </TableHead>
                 <TableHead className="w-[18%] py-2 px-3">
                   <button onClick={() => handleSort("timelineStart")} className="flex items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
-                    Timeline <SortIcon field="timelineStart" />
+                    Timeline {getSortIcon("timelineStart")}
                   </button>
                 </TableHead>
                 <TableHead className="w-[10%] py-2 px-3">
                   <button onClick={() => handleSort("effortTimeHours")} className="flex items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
-                    Effort <SortIcon field="effortTimeHours" />
+                    Effort {getSortIcon("effortTimeHours")}
                   </button>
                 </TableHead>
                 <TableHead className="w-[10%] py-2 px-3">
                   <button onClick={() => handleSort("status")} className="flex items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
-                    Status <SortIcon field="status" />
+                    Status {getSortIcon("status")}
                   </button>
                 </TableHead>
                 <TableHead className="w-[14%] py-2 px-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -299,6 +312,11 @@ export default function ProjectList({
                           {project.projectID && (
                             <span className="text-[10px] font-mono text-muted-foreground bg-muted/60 px-1 py-px rounded shrink-0">
                               {project.projectID}
+                            </span>
+                          )}
+                          {project.tasks?.length > 0 && (
+                            <span className="text-[10px] font-medium text-indigo-600 dark:text-indigo-300 bg-indigo-500/10 px-1 py-px rounded shrink-0">
+                              {project.tasks.length} task{project.tasks.length !== 1 ? "s" : ""}
                             </span>
                           )}
                           {project.projectReportLink ? (
@@ -381,6 +399,15 @@ export default function ProjectList({
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-7 w-7 rounded-lg text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10 transition-colors"
+                          onClick={() => handleArchive(project.id)}
+                          title="Archive project"
+                        >
+                          <Archive className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-7 w-7 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-500/10 transition-colors"
                           onClick={() => handleDelete(project.id)}
                           title="Delete project"
@@ -403,11 +430,11 @@ export default function ProjectList({
               <p className="text-xs text-muted-foreground">
                 Showing{" "}
                 <span className="font-medium text-foreground">
-                  {Math.min((currentPage - 1) * pageSize + 1, sortedProjects.length)}
+                  {Math.min((effectivePage - 1) * pageSize + 1, sortedProjects.length)}
                 </span>
                 {" "}to{" "}
                 <span className="font-medium text-foreground">
-                  {Math.min(currentPage * pageSize, sortedProjects.length)}
+                  {Math.min(effectivePage * pageSize, sortedProjects.length)}
                 </span>
                 {" "}of{" "}
                 <span className="font-medium text-foreground">{sortedProjects.length}</span>
@@ -428,20 +455,20 @@ export default function ProjectList({
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={currentPage === 1} onClick={() => setCurrentPage(1)} title="First page">
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={effectivePage === 1} onClick={() => setCurrentPage(1)} title="First page">
                 <ChevronsLeft className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} title="Previous page">
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={effectivePage === 1} onClick={() => setCurrentPage(Math.max(1, effectivePage - 1))} title="Previous page">
                 <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
               <span className="text-xs text-muted-foreground px-2">
-                Page <span className="font-medium text-foreground">{currentPage}</span> of{" "}
+                Page <span className="font-medium text-foreground">{effectivePage}</span> of{" "}
                 <span className="font-medium text-foreground">{totalPages || 1}</span>
               </span>
-              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} title="Next page">
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={effectivePage >= totalPages} onClick={() => setCurrentPage(effectivePage + 1)} title="Next page">
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(totalPages)} title="Last page">
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" disabled={effectivePage >= totalPages} onClick={() => setCurrentPage(totalPages)} title="Last page">
                 <ChevronsRight className="h-3.5 w-3.5" />
               </Button>
             </div>

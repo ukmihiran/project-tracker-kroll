@@ -148,7 +148,7 @@
 
 /* Gradient backgrounds for stat cards */
 .gradient-indigo {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
 }
 .gradient-emerald {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);

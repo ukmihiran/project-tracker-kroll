@@ -12,12 +12,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { toast } from "react-toastify"
 import { createProject, updateProject } from "@/app/actions/projectActions"
-import { Briefcase, User, Hash, Shield, Users, Link2, Clock, CalendarDays } from "lucide-react"
+import { Briefcase, User, Hash, Shield, Users, Link2, Clock, CalendarDays, CalendarRange } from "lucide-react"
 
-export default function ProjectModal({ isOpen, onClose, project, onSave }: { isOpen: boolean, onClose: () => void, project: any, onSave: (p: any) => void }) {
+export default function ProjectModal({
+  isOpen,
+  onClose,
+  project,
+  onSave,
+  workCycles,
+  selectedCycleId,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  project: any
+  onSave: (p: any) => void
+  workCycles: any[]
+  selectedCycleId?: string
+}) {
   const { register, handleSubmit, reset, formState: { errors }, setValue, control } = useForm<any>({
     resolver: zodResolver(ProjectSchema),
-    defaultValues: { status: 'Active', billable: true, shadowing: false, effortTimeHours: 0, isMultiPerson: false, isLeadConsultant: false }
+    defaultValues: {
+      status: 'Active',
+      billable: true,
+      shadowing: false,
+      effortTimeHours: 0,
+      isMultiPerson: false,
+      isLeadConsultant: false,
+      workCycleId: selectedCycleId ?? "",
+    },
   })
 
   useEffect(() => {
@@ -26,9 +48,17 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }: { isO
       if(project.timelineStart) setValue('timelineStart', new Date(project.timelineStart).toISOString().split('T')[0] as any)
       if(project.timelineEnd) setValue('timelineEnd', new Date(project.timelineEnd).toISOString().split('T')[0] as any)
     } else {
-      reset({ status: 'Active', billable: true, shadowing: false, effortTimeHours: 0, isMultiPerson: false, isLeadConsultant: false })
+      reset({
+        status: 'Active',
+        billable: true,
+        shadowing: false,
+        effortTimeHours: 0,
+        isMultiPerson: false,
+        isLeadConsultant: false,
+        workCycleId: selectedCycleId ?? "",
+      })
     }
-  }, [project, isOpen, setValue, reset])
+  }, [project, isOpen, setValue, reset, selectedCycleId])
 
   const onSubmit = async (data: any) => {
     const res = project ? await updateProject(project.id, data) : await createProject(data);
@@ -129,6 +159,28 @@ export default function ProjectModal({ isOpen, onClose, project, onSave }: { isO
               {errors.projectReportLink && <p className="text-destructive text-xs mt-1">{errors.projectReportLink.message as string}</p>}
             </div>
             {/* Status - shadcn Select */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace</Label>
+              <Controller
+                name="workCycleId"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full h-10 rounded-xl border-border/50 bg-muted/30 focus:ring-primary/50">
+                      <CalendarRange className="h-4 w-4 text-muted-foreground/60 mr-2" />
+                      <SelectValue placeholder="Select workspace" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-border/50">
+                      {workCycles.map((cycle) => (
+                        <SelectItem key={cycle.id} value={cycle.id} className="rounded-lg">
+                          {cycle.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</Label>
               <Controller

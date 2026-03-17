@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "react-toastify"
 import {
   Bell, Check, CheckCheck, Trash2, X, Clock,
-  AlertTriangle, FileText, Calendar, Info,
+  AlertTriangle, FileText, Calendar, Info, CheckSquare2,
 } from "lucide-react"
 import {
   getNotifications, getUnreadCount, markAsRead, markAllAsRead,
@@ -40,33 +40,49 @@ export default function NotificationDropdown({ onNavigate }: NotificationDropdow
     getUnreadCount().then((res) => {
       if (!cancelled && res.success) setUnreadCount(res.count ?? 0)
     })
-    // Generate notifications on first load, then refresh count
-    generateNotifications().then(() => {
-      if (cancelled) return
-      getUnreadCount().then((res) => {
-        if (!cancelled && res.success) setUnreadCount(res.count ?? 0)
-      })
-    })
-    // Refresh count every 60 seconds
+
     const interval = setInterval(() => {
       getUnreadCount().then((res) => {
         if (!cancelled && res.success) setUnreadCount(res.count ?? 0)
       })
-    }, 60000)
+    }, 300000)
+
     return () => { cancelled = true; clearInterval(interval) }
   }, [])
 
   // Load full list when dropdown opens
   useEffect(() => {
     if (!open) return
+
     let cancelled = false
-    getNotifications().then((res) => {
-      if (cancelled) return
-      if (res.success && res.notifications) {
-        setNotifications(res.notifications as Notification[])
+
+    async function loadNotifications() {
+      setLoading(true)
+
+      const generationResult = await generateNotifications()
+      if (!cancelled && generationResult.error) {
+        toast.error(generationResult.error)
       }
+
+      const [notificationsResult, unreadCountResult] = await Promise.all([
+        getNotifications(),
+        getUnreadCount(),
+      ])
+
+      if (cancelled) return
+
+      if (notificationsResult.success && notificationsResult.notifications) {
+        setNotifications(notificationsResult.notifications as Notification[])
+      }
+
+      if (unreadCountResult.success) {
+        setUnreadCount(unreadCountResult.count ?? 0)
+      }
+
       setLoading(false)
-    })
+    }
+
+    loadNotifications()
     return () => { cancelled = true }
   }, [open])
 
@@ -82,13 +98,23 @@ export default function NotificationDropdown({ onNavigate }: NotificationDropdow
   }, [open])
 
   const handleMarkRead = async (id: string) => {
-    await markAsRead(id)
+    const res = await markAsRead(id)
+    if (!res.success) {
+      toast.error(res.error || "Failed to mark notification as read")
+      return
+    }
+
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
     setUnreadCount(prev => Math.max(0, prev - 1))
   }
 
   const handleMarkAllRead = async () => {
-    await markAllAsRead()
+    const res = await markAllAsRead()
+    if (!res.success) {
+      toast.error(res.error || "Failed to mark notifications as read")
+      return
+    }
+
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
     setUnreadCount(0)
     toast.success("All notifications marked as read")
@@ -96,13 +122,23 @@ export default function NotificationDropdown({ onNavigate }: NotificationDropdow
 
   const handleDelete = async (id: string) => {
     const n = notifications.find(n => n.id === id)
-    await deleteNotification(id)
+    const res = await deleteNotification(id)
+    if (!res.success) {
+      toast.error(res.error || "Failed to delete notification")
+      return
+    }
+
     setNotifications(prev => prev.filter(n => n.id !== id))
     if (n && !n.read) setUnreadCount(prev => Math.max(0, prev - 1))
   }
 
   const handleClearAll = async () => {
-    await clearAllNotifications()
+    const res = await clearAllNotifications()
+    if (!res.success) {
+      toast.error(res.error || "Failed to clear notifications")
+      return
+    }
+
     setNotifications([])
     setUnreadCount(0)
     toast.success("All notifications cleared")
@@ -121,6 +157,8 @@ export default function NotificationDropdown({ onNavigate }: NotificationDropdow
       case "project_ending": return <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
       case "assessment_due": return <Calendar className="h-3.5 w-3.5 text-rose-500" />
       case "efr_reminder": return <FileText className="h-3.5 w-3.5 text-indigo-500" />
+      case "task_due": return <CheckSquare2 className="h-3.5 w-3.5 text-amber-500" />
+      case "task_overdue": return <CheckSquare2 className="h-3.5 w-3.5 text-rose-500" />
       default: return <Info className="h-3.5 w-3.5 text-blue-500" />
     }
   }
@@ -130,6 +168,8 @@ export default function NotificationDropdown({ onNavigate }: NotificationDropdow
       case "project_ending": return "bg-amber-500/10"
       case "assessment_due": return "bg-rose-500/10"
       case "efr_reminder": return "bg-indigo-500/10"
+      case "task_due": return "bg-amber-500/10"
+      case "task_overdue": return "bg-rose-500/10"
       default: return "bg-blue-500/10"
     }
   }
@@ -156,7 +196,7 @@ export default function NotificationDropdown({ onNavigate }: NotificationDropdow
         variant="ghost"
         size="icon"
         className="relative h-9 w-9 rounded-xl"
-        onClick={() => { if (!open) setLoading(true); setOpen(!open) }}
+        onClick={() => setOpen(!open)}
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (

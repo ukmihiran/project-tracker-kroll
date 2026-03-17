@@ -1,8 +1,8 @@
-import { ProjectSchema, EfrSchema } from "./schemas";
+import { EfrSchema, ProjectSchema } from "./schemas";
 
 describe("Validation Schemas", () => {
   describe("ProjectSchema", () => {
-    it("should validate a correct project payload", () => {
+    it("validates a correct project payload", () => {
       const validProject = {
         engagementName: "Security Audit",
         clientName: "Acme Corp",
@@ -24,7 +24,7 @@ describe("Validation Schemas", () => {
       expect(result.success).toBe(true);
     });
 
-    it("should fail if required fields are missing", () => {
+    it("fails if required fields are missing", () => {
       const invalidProject = {
         clientName: "Acme",
       };
@@ -33,7 +33,7 @@ describe("Validation Schemas", () => {
       expect(result.success).toBe(false);
     });
 
-    it("should default status to Active if omitted", () => {
+    it("defaults missing optional flags", () => {
       const project = {
         engagementName: "Audit",
         clientName: "Acme",
@@ -51,20 +51,50 @@ describe("Validation Schemas", () => {
       }
     });
 
-    it("should coerce negative effort time to fail or throw error", () => {
+    it("rejects negative effort time", () => {
       const projectWithNegativeEffort = {
         engagementName: "Audit",
         clientName: "Acme",
         assessmentType: "Review",
         effortTimeHours: -10,
       };
+
       const result = ProjectSchema.safeParse(projectWithNegativeEffort);
       expect(result.success).toBe(false);
+    });
+
+    it("rejects timeline ranges where end date is before the start date", () => {
+      const result = ProjectSchema.safeParse({
+        engagementName: "Audit",
+        clientName: "Acme",
+        assessmentType: "Review",
+        timelineStart: "2026-03-20",
+        timelineEnd: "2026-03-01",
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toBe("Timeline end date must be on or after the start date");
+      }
+    });
+
+    it("strips unknown keys such as client supplied ids", () => {
+      const result = ProjectSchema.safeParse({
+        id: "attacker-controlled-id",
+        engagementName: "Audit",
+        clientName: "Acme",
+        assessmentType: "Review",
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).not.toHaveProperty("id");
+      }
     });
   });
 
   describe("EfrSchema", () => {
-    it("should validate a proper EFR submission", () => {
+    it("validates a proper EFR submission", () => {
       const validEfr = {
         title: "Kubernetes Security Guide",
         description: "Published an EFR on container security best practices",
@@ -81,7 +111,7 @@ describe("Validation Schemas", () => {
       expect(result.success).toBe(true);
     });
 
-    it("should fail if title is missing", () => {
+    it("fails if title is missing", () => {
       const invalidEfr = {
         quarter: "Q1-2026",
       };
@@ -90,13 +120,31 @@ describe("Validation Schemas", () => {
       expect(result.success).toBe(false);
     });
 
-    it("should fail if quarter is missing", () => {
+    it("fails if quarter is missing", () => {
       const invalidEfr = {
         title: "Some EFR",
       };
 
       const result = EfrSchema.safeParse(invalidEfr);
       expect(result.success).toBe(false);
+    });
+
+    it("strips unknown keys such as client supplied ids", () => {
+      const result = EfrSchema.safeParse({
+        id: "attacker-controlled-id",
+        title: "Quarterly Feedback",
+        quarter: "Q1-2026",
+        evaluator: "Jane Smith",
+        engagement: "Acme - Audit",
+        engagementStart: "2026-01-15",
+        role: "Consultant",
+        duration: "1 week",
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).not.toHaveProperty("id");
+      }
     });
   });
 });

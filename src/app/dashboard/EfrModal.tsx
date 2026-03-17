@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { useForm, Controller } from "react-hook-form"
+import { useForm, Controller, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { EfrSchema } from "@/lib/schemas"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "react-toastify"
 import { createEfr, updateEfr } from "@/app/actions/efrActions"
-import { FileText, User, Briefcase, Calendar, Clock, MessageSquare, Shield } from "lucide-react"
+import { FileText, User, Briefcase, Calendar, Clock, MessageSquare, Shield, CalendarRange, Link2 } from "lucide-react"
 
 // Generate quarter options for the current year
 function getQuarterOptions() {
@@ -35,20 +35,34 @@ interface EfrModalProps {
   isOpen: boolean
   onClose: () => void
   onSave: (efr: any) => void
-  projects?: { clientName: string; engagementName: string }[]
+  projects?: any[]
+  workCycles: any[]
+  selectedCycleId?: string
   efr?: any // If provided, we're in edit mode
 }
 
-export default function EfrModal({ isOpen, onClose, onSave, projects = [], efr }: EfrModalProps) {
+export default function EfrModal({
+  isOpen,
+  onClose,
+  onSave,
+  projects = [],
+  workCycles,
+  selectedCycleId,
+  efr,
+}: EfrModalProps) {
   const isEditMode = !!efr
-  const { register, handleSubmit, reset, formState: { errors }, control } = useForm<any>({
+  const { register, handleSubmit, reset, formState: { errors }, control, setValue } = useForm<any>({
     resolver: zodResolver(EfrSchema),
   })
+  const activeCycleId = useWatch({ control, name: "workCycleId" }) || selectedCycleId
+  const cycleProjects = projects.filter((project) => project.workCycleId === activeCycleId && !project.archivedAt)
 
   // Pre-fill form when editing
   useEffect(() => {
     if (efr && isOpen) {
       reset({
+        workCycleId: efr.workCycleId || selectedCycleId || "",
+        projectId: efr.projectId || "none",
         title: efr.title || "",
         description: efr.description || "",
         quarter: efr.quarter || "",
@@ -60,15 +74,24 @@ export default function EfrModal({ isOpen, onClose, onSave, projects = [], efr }
         contextComment: efr.contextComment || "",
       })
     } else if (!efr && isOpen) {
-      reset({})
+      reset({
+        workCycleId: selectedCycleId || "",
+        projectId: "none",
+      })
     }
-  }, [efr, isOpen, reset])
+  }, [efr, isOpen, reset, selectedCycleId])
 
-  const engagementOptions = projects.map((p) => `${p.clientName} - ${p.engagementName}`)
+  const engagementOptions = cycleProjects.map((p) => ({ value: `${p.clientName} - ${p.engagementName}`, projectId: p.id }))
 
   const onSubmit = async (data: any) => {
+    const payload = {
+      ...data,
+      workCycleId: data.workCycleId || selectedCycleId,
+      projectId: data.projectId === "none" ? undefined : data.projectId,
+    }
+
     if (isEditMode) {
-      const res = await updateEfr(efr.id, data)
+      const res = await updateEfr(efr.id, payload)
       if (res.success) {
         toast.success(
           <div><div className="font-medium">EFR updated successfully</div><div className="text-xs opacity-75 mt-0.5">{data.title}</div></div>
@@ -80,7 +103,7 @@ export default function EfrModal({ isOpen, onClose, onSave, projects = [], efr }
         toast.error(res.error || "Failed to update EFR")
       }
     } else {
-      const res = await createEfr(data)
+      const res = await createEfr(payload)
       if (res.success) {
         toast.success(
           <div><div className="font-medium">EFR submitted successfully</div><div className="text-xs opacity-75 mt-0.5">{data.title}</div></div>
@@ -145,6 +168,63 @@ export default function EfrModal({ isOpen, onClose, onSave, projects = [], efr }
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Workspace</Label>
+              <Controller
+                name="workCycleId"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className={`w-full ${fieldClass}`}>
+                      <CalendarRange className="h-3.5 w-3.5 text-muted-foreground/60 mr-2" />
+                      <SelectValue placeholder="Select workspace" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-border/50">
+                      {workCycles.map((cycle) => (
+                        <SelectItem key={cycle.id} value={cycle.id} className="rounded-lg text-sm">
+                          {cycle.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Link to Project</Label>
+              <Controller
+                name="projectId"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value ?? "none"}
+                    onValueChange={(value) => {
+                      field.onChange(value)
+                      const selectedOption = engagementOptions.find((option) => option.projectId === value)
+                      if (selectedOption) {
+                        setValue("engagement", selectedOption.value, { shouldDirty: true })
+                      }
+                    }}
+                  >
+                    <SelectTrigger className={`w-full ${fieldClass}`}>
+                      <Link2 className="h-3.5 w-3.5 text-muted-foreground/60 mr-2" />
+                      <SelectValue placeholder="Optional project link" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-border/50 max-h-48">
+                      <SelectItem value="none" className="rounded-lg text-sm">No linked project</SelectItem>
+                      {cycleProjects.map((project) => (
+                        <SelectItem key={project.id} value={project.id} className="rounded-lg text-sm">
+                          {project.engagementName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+          </div>
+
           {/* Row 2: Evaluator */}
           <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Who Evaluated You?</Label>
@@ -169,8 +249,8 @@ export default function EfrModal({ isOpen, onClose, onSave, projects = [], efr }
                       <SelectValue placeholder="Select engagement" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-border/50 max-h-48">
-                      {engagementOptions.map((e) => (
-                        <SelectItem key={e} value={e} className="rounded-lg text-sm">{e}</SelectItem>
+                      {engagementOptions.map((option) => (
+                        <SelectItem key={option.projectId} value={option.value} className="rounded-lg text-sm">{option.value}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

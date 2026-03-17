@@ -1,25 +1,14 @@
 "use server"
 
-import { prisma } from "@/lib/db"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import bcrypt from "bcryptjs"
-import { UpdateProfileSchema, ChangePasswordSchema } from "@/lib/schemas"
 
-async function getAuthenticatedUser() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user) {
-    return null
-  }
-  // The id and role are added via JWT callback in NextAuth config
-  const user = session.user as { id?: string; email?: string | null; name?: string | null; role?: string }
-  if (!user.id) return null
-  return user
-}
+import { getServerUser } from "@/lib/auth"
+import { prisma } from "@/lib/db"
+import { ChangePasswordSchema, UpdateProfileSchema } from "@/lib/schemas"
 
 export async function getProfile() {
   try {
-    const sessionUser = await getAuthenticatedUser()
+    const sessionUser = await getServerUser()
     if (!sessionUser) return { error: "Not authenticated" }
 
     const user = await prisma.user.findUnique({
@@ -58,18 +47,17 @@ export async function getProfile() {
 
 export async function updateProfile(name: string, email: string) {
   try {
-    const sessionUser = await getAuthenticatedUser()
+    const sessionUser = await getServerUser()
     if (!sessionUser) return { error: "Not authenticated" }
 
     const parsed = UpdateProfileSchema.safeParse({ name, email })
     if (!parsed.success) {
-      return { error: parsed.error.issues.map((i) => i.message).join(", ") }
+      return { error: parsed.error.issues.map((issue) => issue.message).join(", ") }
     }
 
     const normalizedEmail = parsed.data.email.toLowerCase().trim()
     const trimmedName = parsed.data.name.trim()
 
-    // Check if email is already taken by another user
     if (normalizedEmail !== sessionUser.email?.toLowerCase()) {
       const existingUser = await prisma.user.findUnique({
         where: { email: normalizedEmail },
@@ -106,7 +94,7 @@ export async function changePassword(
   confirmPassword: string
 ) {
   try {
-    const sessionUser = await getAuthenticatedUser()
+    const sessionUser = await getServerUser()
     if (!sessionUser) return { error: "Not authenticated" }
 
     const parsed = ChangePasswordSchema.safeParse({
@@ -115,35 +103,25 @@ export async function changePassword(
       confirmPassword,
     })
     if (!parsed.success) {
-      return { error: parsed.error.issues.map((i) => i.message).join(", ") }
+      return { error: parsed.error.issues.map((issue) => issue.message).join(", ") }
     }
 
-    // Get user with password hash
     const user = await prisma.user.findUnique({
       where: { id: sessionUser.id },
       select: { id: true, passwordHash: true },
     })
     if (!user) return { error: "User not found" }
 
-    // Verify current password
-    const isCurrentValid = await bcrypt.compare(
-      parsed.data.currentPassword,
-      user.passwordHash
-    )
+    const isCurrentValid = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash)
     if (!isCurrentValid) {
       return { error: "Current password is incorrect" }
     }
 
-    // Ensure new password is different from current
-    const isSamePassword = await bcrypt.compare(
-      parsed.data.newPassword,
-      user.passwordHash
-    )
+    const isSamePassword = await bcrypt.compare(parsed.data.newPassword, user.passwordHash)
     if (isSamePassword) {
       return { error: "New password must be different from your current password" }
     }
 
-    // Hash and update
     const newHash = await bcrypt.hash(parsed.data.newPassword, 12)
     await prisma.user.update({
       where: { id: sessionUser.id },
@@ -159,7 +137,7 @@ export async function changePassword(
 
 export async function deleteAccount(password: string) {
   try {
-    const sessionUser = await getAuthenticatedUser()
+    const sessionUser = await getServerUser()
     if (!sessionUser) return { error: "Not authenticated" }
 
     if (!password || password.length === 0) {
@@ -172,14 +150,13 @@ export async function deleteAccount(password: string) {
     })
     if (!user) return { error: "User not found" }
 
-    // Verify password before deletion
     const isValid = await bcrypt.compare(password, user.passwordHash)
     if (!isValid) {
       return { error: "Incorrect password" }
     }
 
-    // Delete all user data in a transaction
     await prisma.$transaction([
+      prisma.notification.deleteMany({ where: { userId: user.id } }),
       prisma.efrSubmission.deleteMany({ where: { userId: user.id } }),
       prisma.project.deleteMany({ where: { userId: user.id } }),
       prisma.user.delete({ where: { id: user.id } }),
